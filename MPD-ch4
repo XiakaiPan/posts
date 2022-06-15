@@ -1,0 +1,227 @@
+#! https://zhuanlan.zhihu.com/p/526553098
+# Chapter 4. SuperScalar Organization
+
+- superscalar: higher performance 
+  - simultaneously advance multiple instructions through the pipeline stages
+  - execute instruction in an order different from that specified in program
+
+- contents
+  - ch4: organization of superscalar machine
+  - ch5: techniques addressing the dynamic interaction between machine and instructions
+  - ch6/7: commercial designs
+  - ch8: survey
+
+## 1. Limitations of Scalar Pipelines
+The rigid scalar pipelines have three fundamental limitations:
+### 1.1. Upper Bound on Scalar Pipeline Throughput
+The maximum throughput for a scalar pipeline is bounded by 1 instruction per cycle.
+
+$$Performance=\frac{1}{\frac{instructions\_count}{IPC}\times{clock\_period}}=\frac{IPC}{instructions\_count\times{clock\_period}}=\frac{IPC\times{frequency}}{instructions\_count}$$
+
+Less is better.
+
+- To improve the performance: 
+  - on way is to decrease the value of ${frequency}$ without increase IPC two much
+  - or initiate machine with more than one instruction
+### 1.2. Inefficient Unification into a Single Pipeline
+
+The unification of all instruction types into one pipeline can yield an inefficient design.
+### 1.3. Performance Lost due to a Rigid Pipeline
+The stalling of a lockstep or rigid scalar pipeline induces unnecessary pipeline bubbles.
+## 2. From Scalar to Superscalar Pipelines
+### 2.1. Parallel Pipelines
+
+- temporal and spatial parallelism
+    ![parallel pipeline](./figs/4-temporal-spatial-parallel.png)
+
+- parallel example: Intel 486 vs. Pentium [Intel Corp., 1993]
+  ![pentium](./figs/4-temporal-spatial-parallel.png)
+  - cost from scalar to parallel pipeline of width s=2: 2 execution pipes
+      - ALU operations: 2 ALU 
+      - accessing D-cache: additional ports to the register file
+        - 2 load/store instructions
+          - dual access D-cache--expensive, 8-way interleaving single-ported D-cache in Pentium
+          - bank conflict: serialize D-cache access
+
+### 2.2. Diversified Pipelines
+- Executing of different types of instructions needs different function units
+  - a general pipeline should include all possible FUs to support all class of potential instructions
+  - general pipeline is often a kind of waste because of travelling the unnecessary stages and units 
+- This inefficiency due to unification into one single pipeline is naturally addressed in parallel pipelines by employing multiple different functional units in the execution stage(s).
+  ![diversified pipeline](./figs/4-diversed-pipeline.png)
+  - after ***RD*** stage, instructions are dispatched to four execution pipes based on the instruction types
+  - eg.
+    - CDC 6600([Thornton, 1964])
+    - Motorola 88110( [Diefendorf and Allen, 1992])
+
+### 2.3. Dynamic Pipelines
+
+![dynamic pipeline](./figs/4-dynamic-pipeline.png)
+
+- multientry buffer extension
+  - The entire multientry buffer is either clocked or stalled in each machine cycle. However, such operation of the parallel pipeline may induce unnecessary stalling of some of the instructions in a multientry buffer.
+- interaction between buffer entries
+  - despite of buffers which are hardwired to 1 write and 1 read port, there are 2 kinds of improvement:
+    - add connectivity between entries to facilitate movement of data between entries
+    - provide a mechanism for independent accessing of each entry in the buffer
+      - requires the ability to explicitly address each individual entry in the buffer--resembled into a small ***multiported RAM***
+      - advantages
+        - With such a buffer an instruction can ***remain*** in an entry of the buffer for many machine cycles and can be ***updated or modified*** while resident in that buffer
+        - further enhancement can incorporate associative accessing of the entries in the buffer, so the accessing can be implemented by using associative tag to index into the entry--a small ***associative cache memory***
+- out-of-order execution
+  - preperation: the use of complex multientry buffers for buffering instructions in flight
+  - mechanism: bypassing to approach the limit of instruction execution
+    - in order to minimize unnecessary stalling of instructions in a parallel pipeline, trailing instructions must be allowed to bypass a stalled leading instruction
+    - instructions are executed as soon as their operands are available
+  - *dynamic pipeline*: a parallel pipeline that supports out-of-order execution
+
+![out-of-order](./figs/4-out-of-order.png)
+
+- reordering
+  - to ensure that exceptions can be handled according to the original program order, the instructions must be completed (i.e. the machine state must be updated), in program order.
+  - *completion buffer*             
+- conclusion: such a dynamic pipeline facilitates the out-of-order execution of instructions in order to
+  -  achieve the shortest possible execution time, and yet 
+  -  is able to provide precise exception by retiring the instructions and updating the machine state according to the program order.
+
+- Q
+  - precise exception? 
+    - [A1](https://www.cnblogs.com/LuoboLiam/p/13411709.html)
+    - [A2](attaches/cs252s05-lec09-precise-exceptions.pdf)
+  - machine state?
+## 3. Superscalar Pipeline Overview
+- focus on structural design
+- ***TEM superscalar machine*** as template
+  - logical stages rather than physical ones: *fetch, decode, dispatch, execute, complete, retire*
+  - multientries buffers: complexity of them can vary depending on their functionality and location in the superscalar pipeline
+  ![tem](./figs/4.3-TEM.png)
+
+
+### 3.1. Instruction Fetching 
+- Organization of a Wide I-Cache
+- Solution to Mislignment
+  - static technique employed at compile time
+    - the compiler places instruction in proper memory locations based on the information on the organization of the I-cache(e.g. indexing scheme, row size), so as to ensure the aligning of fetch groups wqith physical rows
+    - problems
+      - particular I-cache organization-customized object code generation
+      - the static code now can occupy a larger address range, which can potentially lead to a higher I-cache miss rate
+  - using hardware at run time: alignment hardware can be incorporated to ensure that *s* instructions are fetched in every cycle even if the fetch group crosses row boundary (not cache line boundary)
+    - e.g. IBM RS/6000: 2-way associative I-cache with a line size of 16 instructions(64 bytes)
+      - organization
+        - each row of the I-cache array stores four associative sets (two per set) of instructions, which are four physical rows
+        - any of the four subarrays can be accessed in parallel to get instructions: tags are used to decide which set should be accessed
+        ![2-way set-associative I-cache](./figs/4.3-2set-set-associative.png)
+      - dealing with alignment: T-logic judges whether instructions in subarray 0, 1, 2 should be accessed when the start address point to subarray 1, 2, 3; can not cross a cache line boundary
+      - the average width for the 16 posiible starting addresses of a word in a chache line: (13/16) x 4 + (1/16) x 3 + (1/16) x 2 + (1/16) x 1 = 3.625 instructions per cycle
+      - *instruction buffer network*: contains a rotating network to ensure high fetch bandwidth(4)
+- Second problem: control-flow changing instructions within the fetch group
+  - solved in chapter 5
+### 3.2. Instruction Decoding
+- A RISC instruction set simplifies the instruction decoding task.
+- RISC scalar pipeline's decoding is quite trivial
+    - accessing the register operands, merged with register read stage
+    - two key tasks
+        - identify dependences between these instructions and determine the independent instructions that can be dispatched in parallel
+        - identify control-flow changing branch instructions to provide feedback to the fetch stage
+    - problem: the conjuction of accessing and the 2 tasks above will lead to higher complexity of the logic in fetch stage
+        - A large number of comparators are needed for determining register dependences between instructions.
+        - the register files must be multiported and able to support many simultaneous accesses. 
+        - Multiple busses are also needed to route the accessed operands to their appropriate destination buffers. 
+    - result: the decode stage might become the critical stage in the overall superscalar pipeline
+    - more complex CISC decoding
+        - Intel Pentium, AMD K5: 2 pipeline stages for decoding IA32 instructions
+        - Intel Pentium Pro: 5 cycles to decode
+- traditions from CISC decoder design
+    -  additional burden on the decoder: translation from the architected insts. to internal low-level op.s which can be directly executed by the hardware
+    -  solution:  [Patt et al., 1985], high-performance substrate (HPS), decomposes complex VAX CISC inst.s int oRISC-like primitives
+        -  ROP (RISC Operations) in AMD K5
+        -  μop (micro-operations) in Intel P6
+        -  In these CISC parallel pipelines, between the instruction decoding and instruction completion stages, all instructions in flight within the machine are these internal operations
+### 3.3. Instruction Dispatching
+- between the decode and the execute: the necessity of dispatching
+  - centralized decoding 
+  - distributed execution after resolving instruction dependence problem
+  ![dispatch](./figs/4.3-dispatch.png)
+- implementation of dispatching
+  - mechanism of instruction issuing
+  - buffer
+    - lack of oprands of some instructions fetched in the same cycle, where the operands are the results of the unfinished ones
+    - solution
+      - obvious: stall decoding--restrict the decoding throughput
+      - better one: fetch those register operands that are read and go ahead; advance those instructions whose operands are not ready into a separate buffer
+        - *IBM 360/91[Tomasulo, 1967]*: ***reservation station***
+        - decouples instruction decoding and instruction execution and provides a buffer to take up the slack between decoding and execution stages due to the temporal variation of throughput rates in the two stages
+        - eliminates unnecessary stalling of the decoding stage and prevents unnecessary starvation of the execution stage
+    - two types of reservation station
+      - centralized--Intel Pentium Pro
+        ![centralized ResStation](./figs/4.3-centr-rs.png)
+      - distributed: PowerPC 620
+        ![distributed RS](./figs/4.3-distr-rs.png) 
+      - clustered reservation stations--hybrids: MIP 10000
+      - tradeoffs
+        - centralized
+          - likely the best overall utilization of all the entries; 
+          - can incur the greatest complexity in its hardware design: centralized control, highly multiported buffer to support multiple concurrent accesses
+        - distributed: single-ported buffers with only a small number of entries; the idling entries reduce the overall rate of utilization; the saturation of a reservation station might result in stalling in dispatching
+      - terms: dispatching v.s. issuing
+        - distributed: separately dispatch, issue
+        - centralized: combined
+### 3.4. Instruction Executing 
+- trend: more parallel and more diversified pipelines
+  - early scalar pipelined processor: one functional unit to execute all types of instructions
+  - first-generation superscalar processors: two diversified FUs--integer, floating-point
+- e.g.s
+  - TI SuperSPARC: multiple integer FUs--cascaded ALU configuration  [Blanck and Krueger, 1992]
+  - IBM RS/6000: multiply-add-fused(MAF) unit to perform dot-product operation
+
+- specialized FUs
+  - incorporated branch & load/store instructions
+  - multimedia operations support
+    - Motorola 88110
+    - TriMedia VLIW processor [Slavenburg et al., 1996]
+
+- What's the best mix of FUs?
+  - ideal condition: 4:2:4--40% ALU, 20% branches, 40% load/store
+  - real design: 4:1:1--4+ ALU-type FUs, 1 branch unit(can speculate beyond 1 conditional branch instruction), 1 load/store units (process 2 instructions with some constraints)
+    - too few load/store units: multiported D-cache can be complex and difficult to implement, might slow down the memory speed
+    - solutions to few L/S units
+      - memory banks to simulate a truly multiported memory: if no conflict between banks accessing--multiport, if conflict, serialize the accesses
+        - the Intel Pentium processor uses an eight-banked D-cache to simulate a two-ported D-cache [Intel Corp., 1993].
+      - implement multiported memory by having multiple copies of the memory
+
+- the amount of resource parallelism: determined by ***spatial and temporal*** parallelism
+  - spatial: multiple FUs
+  - temporal: pipelining of FUs
+- real superscalar pipeline designs: more FUs exceeds the actual width of the parallel pipeline
+  - dynamic veriation of instruction mix and the resultant nonuniform distribution of instruction
+  - research:  assessing the best number and mix of functional units based on SPEC benchmarks [Jourdan et al., 1995]
+- increasing of complexity out of Fus
+  - forwarding: multiplicity of busses, potential logic for bus control and arbitration, reservation station monitoring burden(latency, complexity)
+  - interconnections between FUs: introduces extra structural dependence, longer latency
+### 3.5. Instruction Completion and Retiring
+
+- definition of completion and Retiring
+  - completed: finish execution and update the machine state(arhitecture register)
+  - retiring: updating of the memory state (e.g. a store instruction ***complete*** when it exits the completion buffer and enters the store buffer to wait for the avalibility of a bus cycle in order to write to the D-cache; it is considered ***retired*** when it exits the store buffer and updates the D-cache)
+- interrupts
+  - induced by the ***external*** environment such as I/O devices or the OS
+  - processing: suspend program to allow the OS to service the interrupt; stop fetching, allow the instructions already in pipeline to finish execution, save the state of the machine, restore
+- exceptions
+  - induced by the execution of the instructions of the program--***internal***
+  - e.g.s & solution
+    - divided by 0, FP overflow or underflow: OS intervene to log the exception
+    - page faults in a page-based virtual memory: a new page must be brought in from another storage--might require on the order of thounsands of machine cycles, a new program is initiated in the multiprogramming environment
+- precise exception
+  - the necessay: resume excution after the exception is serviced
+  - requirements: maintaining processor's architectural state (even out of order)
+    - being able to checkpoint the state of the machine just prior to the execution of the excepting instruction and resume execution by restoring the checkpointed state
+    - restarting exc at the excepting instruction
+  - mechanism for reorder buffer to handle exceptions
+  - e.g.: 
+    - Acosta et al. [1986], Sohi and Vajapeyam [1987], and Smith and Pleszkun [1988]
+    - Metaflow idea,  [Popescu et al., 1991].
+![Dynamic Pipeline](./figs/4.3-terms.png)
+## 4. Summary
+- static structures of superscalar processors
+  - organization
+  - issues associated with the various pipeline stages

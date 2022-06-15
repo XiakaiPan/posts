@@ -1,0 +1,213 @@
+#! https://zhuanlan.zhihu.com/p/526434175
+
+
+# Pipelined Processors
+
+> Modern Processor Design: Fundamentals of Superscalar Processors
+
+- 1960s high-end mainframes
+- IBM 7030-first instruction pipelining
+- 1980s- cornerstone of the RISC approach
+    - CISC apply: Intel i486, Motorola's M68K
+
+- contents: approaches & techniques to design scalar pipelined processors
+
+## 1. Pipelining Fundamentales
+> Motivation & fundamentle principles of pipelining
+### 1.1. Pipelined Design
+#### 1.1.1. Motivations
+#### 1.1.2. Limitations
+
+$T = min(T_2 - T_1) > T_M - T_m + T_L$
+
+where T is the clock period, $T_1, T_2$ is the times when signals as the input of two stages $X_1, X2$ arrive.
+
+$T_M, T_m$ represents the maximum and minimum time to propogate the signal through a stage without latch part which can be thought as combinational logic F followed by a a set of latches.
+
+To ensure that the second set of signals does not overrun the first set, it is required that $T_2 + T_m > T_1 + T_M + T_L$.
+
+- $T_L$ is the additional time needed for proper clocking:
+  - necessary time setup and hold times to ensure proper latching
+  - potential clock skews, that is, the worst-case disparity between the arrival times of the clock edge at different latches
+
+- To maximize the frequency $\frac{1}{T}$ limit, the period time should be as short as possible. There are two methods
+  - Equalize $T_M, T_m$ to let $T_M-T_m$ approach 0
+  - decrease $T_L$
+
+- Conclusion: the limit of how deeply a synchronous system can be pipelined is determined by ***the minimum time required for latching*** and the ***uncertainty associated with the delays in the clock*** distribution network.
+#### 1.1.3. Tradeoff
+
+1. model
+
+   $$\frac{C}{P} = \frac{G+kL}{\frac{1}{T/k+S}}$$
+
+   k is the number of stages,
+
+   where C(cost) $=G+kL$, G is the cost of nonpipelined design, L is the cost of adding each latch.
+
+   P(Performance) $=\frac{1}{T/k + S}$, T is the latency of nonpipelined design, S is the delay due to the latch.
+
+2. conclusion
+   $$\frac{C}{P} = LSk+\frac{GT}{k} +LT+GS=Ak+\frac{B}{k}+Const$$
+   so the optimal value of k is:
+   $$k_{opt} = \sqrt{\frac{GT}{LS}}$$
+
+> two types of pipelines
+### 1.2. Arithmetic Pipeline Example
+Arithmetic pipelines clearly illustrate the effectiveness of pipelining without having to deal with some of the complex issues invlolved in instruction pipeline.
+#### 1.2.1. Floating-Point Multiplication
+#### 1.2.2. Pipelined Floating-Point Multiplier
+
+### 1.3. Instruction Pipelining
+
+Three challenges based on the pipelining idealism assumptions.
+
+#### 1.3.1. Instruction Pipeline Design
+#### 1.3.2. Instruction Set Architecture Impacts
+
+> pipelining idealism
+
+### 1.4. Pipelining Idealism
+#### 1.4.1. Uniform Subcompuations
+The computation to be performed can be evenly partitioned into uniform-latency subcomputation.
+
+#### 1.4.2. Identical computation
+The same computation is to be performed repeatedly on a large number of input data sets.
+
+#### 1.4.3. Independent computations
+
+All the repetitions of the same computation are mutually independent.
+
+## 2. Pipelined Processor Design
+### 2.1. Uniform subcomputations => balancing pipeline stages
+1. IF
+2. ID
+3. OF(operands fetch)
+4. EX(instruction execution)
+5. OS(operand store)
+
+#### 2.1.1. Stage Quantinization
+- combine IF, ID which have short latency: MIPS R2000/R3000
+- partitioned extra-long latency into multiple subcomputation of shorter latencies: AMDAHL 470V/7
+- internal fragmentation: to evaluate 
+
+#### 2.1.2. Hardware Requirements
+- three categories of hw req.:
+1. the logic required fro control and data manipulation in each stage
+2. register-file ports to support concurrent register accessing by multiple stages
+3. memory ports to support concurrent memory accessing by multiple stages 
+
+- Analysis towards 4/11-stages pipeline
+  - 4
+  - 11
+    - IF$\to$IF1/2: to accommodate slow instruction memory, IF is initiated in IF1 and completed in IF2
+      - instruction memory should be able to support two concurrent access by IF1/2 pipeline stages in every cycle.
+    - OF+OS$\to$ 3x2: data memory  should support 6 independent concurrent access without conflict in evry machine cycle
+    - if instruction/data memory are unified: 8-ported memory unit -- expensive
+
+- conclusion: when the degree of pipeline (pipeline depth) increases, the hardware resource increases significantly in these aspects:
+  - the additional ports to the register files and the memory units needed to support the increased degree of concurrent access
+  - to pipeline long memory accessing latency: complex
+
+#### 2.1.3. Example Instructin Pipelines
+### 2.2. Identical computations => unifying instruction types
+- external fragmentation
+
+#### 2.2.1. Classification of Instruction Types
+- generic tasks vs. instructions
+    1. Arithmetic operation: ALU 
+    2. Data movement: Load/Store
+    3. Instruction sequencing: Branch
+
+#### 2.2.2. Coalescing of Resource Requirements
+#### 2.2.3. Instruction Pipeline Implementation
+### 2.3. Independent computations => minimizing pipeline stalls
+#### 2.3.1. Program Dependances and Pipeline Hazards
+- WAR
+- RAW
+- WAR
+
+#### 2.3.2. Identification of Pipeline Hazards
+- Scalar instruction pipeline: a single pipeline with multiple pipeline stages organized in a linear sequential order.
+- 6-stage TYP instruction pipeline
+1. Memory data dependence: only WB access memory; no pipeline hazards due to memory data dependency
+2. Register data dependence: 
+   1. no WAW; RD-read WB-write register
+   2. no WAR; RD is ahead of WB
+   3. RAW: j follows i, j read the result of i when i in RD stage and j in ALU
+3. Control dependence: can be viewed as a form of ***RAW*** hazard invloving the PC
+
+#### 2.3.3. Resolution of Pipeline Hazards
+- data hazard: The worst-case penalty is three cycles between WB of instruction i(ALU or LOAD) and RD of j.
+- control hazard
+  - *i* is a branch instruction, which updates PC in the **MEM** stage, the fetching of the trailing inst. *j* requires reading of the PC in the **IF** stage, the worst-case penalty is 4 cycles
+  - processing methods: fetching should be stopped by stalling only when the conditional branch is actually taken
+    - the pipeline assumes that the branch will not be taken
+    - in the event that the branch is taken, the PC is updated with the branch target in the **MEM** stage, 5 instructions which are fetched in the earlier stages are deleted or flushed, the next instruction fetched is the branch target
+  - **Delayed branches**: insert instructions not control-independent on instruction *i* between *i* and *j*
+    - difficulty: the lack of mechanism to distinguish the filled instructions from the normal sequential
+
+#### 2.3.4. Penalty Reduction via Forwarding Paths
+- *critical forwarding path*
+  - ALU penalty
+  - load penalty
+  - branch 
+
+#### 2.3.5. Implementation of Pipeline Interlock
+> Hardware mechanism to detect and solve all pipeline hazards by stalling, forwarding.
+
+![TYP pipeline](figs/TYP.png)
+
+- Physical implementation of Pipeline Interlock for RAW Hazards Involving a Leading ALU Instruction
+  - *ALU forwarding paths*
+  - The rectangles of up-left corner represents **WB, MEM, ALU, RD** stages.
+  - There are 4 comparators compare the two source registrer specifiers of *j* with *j-1*'s and *j-2*'s repsectively.
+
+- *load forwarding paths*
+
+![alu-load ](figs/pipeline-interlock-alu-load.png)
+- *branch forwarding paths*
+
+![branch-control-hazard](figs/branch.png)
+
+### 2.4. Commercial Pipelined Processors
+> 3 papers
+#### 2.4.1. RISC Pipelined Processor Example
+MIPS R2000/3000 5-stage pipeline.
+#### 2.4.2. CISC Pipelined Processor Example
+
+Intel 486 (CPI from 4.9 of 386 to 1.95)
+#### 2.4.3. Scalar Pipelined Processor Performance
+- By scheduling the load and branch penalty slots, the CPI overheads due to load and branch penalties are significantly reduced. The resultant CPI of 1.23 is approaching the idealized goal of CPI = 1. 
+- The CPI overhead due to the branch penalty is still significant.
+  - PC-relative mode of addressing for branch, A separate adder can be included to generate the target address in parallel with the register read stage.
+  - Hence, for the branch instructions that employ PC-relative addressing, the ***branch penalty can be reduced by one cycle***.
+## 3. Deeply Pipelined Processors
+- The primary benefit of deeper pipelines is the ability to reduce the machine cycle time and hence increase the clocking frequency.
+- trend: deeper, wider(such as superscalar)
+- To ensure overall performance improvement wit a deeper pipeline, the increase in clocking frequency must exceed the increase in CPI
+  - to reduce the braqnch penalty, one way is to reduce the number of stages in the front end.
+    - eg. from CISC to RISC decode (less complexity of decoding because of fixed length instruction); pre-decode from the I-cache require less deecoding logic and hence fewer decode stages
+  - move some of the complexity from frontend to back end, 
+    - eg. decoding from I-cache; optimization in back end
+
+- tradeoffs invlolved in designing deep pipelines
+  - *k* to indicate the optimal value of the number of stages about cost and performance
+  - *frequency/CPI*
+    -  As pipeline depth increases, frequency can be increased. However the frequency does not increase linearly with respect to the increase of pipeline depth. The sublinear increase of frequency is due to the overhead of adding latches. As pipeline depth increases, CPI also increases due to the increase of branch and load  penalties.
+    - without considering power consumption, research shows: ~25(Hartstein and Puzak [2003]); 50 is the optimum pipeline depth(Sprangle and Carmean [2002])
+    - with power in consideration(Hartstein and Puzak [2003]): 6-9, 10-15 assuming lower latching overhead and with increasing leakage power
+## 4. Summary
+- pipelining techniques: CISC, RISC
+- the key impediment to pipelined processor performance: stalling because of inter-instruction dependences
+  - branch penalty due to control dependence is the biggest culprit: dynamic branch prediction--penalty occurs only when mispedict
+  - strategies to reduce branch penalty
+    - reduce the distance between fetch and the stage where branch instructions are resolved
+    - increase the accuracy of the dynamic branch prediction algorithm to reduce the frequency of mispredicting--chapter 5
+- view point of pepeline design method
+  - classic view of CPU design: partitions the design of a processor into data path design and control path design
+    - data path: ALU, FUs
+    - control path: designs of state machines to decode instructions and generate the sequence of control signals
+  - current design
+    - traversal through: decoded instructions with associated control signals are propogated down the pipeline and used by various subsequent pipeline stages
+    - a form of distributed control via the propagation of the control signals, that is an integrated pipeline
